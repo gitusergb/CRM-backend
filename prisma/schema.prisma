@@ -1,0 +1,144 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  MANAGER
+  SALES_EXECUTIVE
+}
+
+enum LeadStatus {
+  NEW
+  CONTACTED
+  QUALIFIED
+  PROPOSAL
+  NEGOTIATION
+  CLOSED_WON
+  CLOSED_LOST
+}
+
+enum ActivityType {
+  NOTE
+  CALL
+  MEETING
+  UPDATE
+  EMAIL
+}
+
+model User {
+  id            String    @id @default(uuid())
+  email         String    @unique
+  password      String
+  firstName     String
+  lastName      String
+  role          UserRole  @default(SALES_EXECUTIVE)
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relations
+  leadsAssigned Lead[]           @relation("AssignedTo")
+  leadsCreated  Lead[]           @relation("CreatedBy")
+  activities    Activity[]
+  notifications Notification[]
+
+  @@map("users")
+}
+
+model Lead {
+  id          String     @id @default(uuid())
+  firstName   String
+  lastName    String
+  email       String?
+  phone       String?
+  company     String?
+  title       String?
+  status      LeadStatus @default(NEW)
+  source      String?
+  value       Float?     @default(0)
+  notes       String?    @db.Text
+  assignedToId String?
+  createdById  String
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  // Relations
+  assignedTo  User?      @relation("AssignedTo", fields: [assignedToId], references: [id])
+  createdBy   User       @relation("CreatedBy", fields: [createdById], references: [id])
+  activities  Activity[]
+  history     LeadHistory[]
+
+  @@index([assignedToId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("leads")
+}
+
+model Activity {
+  id          String       @id @default(uuid())
+  type        ActivityType
+  title       String
+  description String?      @db.Text
+  leadId      String
+  userId      String
+  scheduledAt DateTime?
+  completedAt DateTime?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  // Relations
+  lead        Lead         @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  user        User         @relation(fields: [userId], references: [id])
+
+  @@index([leadId])
+  @@index([userId])
+  @@index([type])
+  @@map("activities")
+}
+
+model LeadHistory {
+  id          String     @id @default(uuid())
+  leadId      String
+  fieldName   String
+  oldValue    String?
+  newValue    String?
+  changedById String?
+  createdAt   DateTime   @default(now())
+
+  // Relations
+  lead        Lead       @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@index([leadId])
+  @@index([createdAt])
+  @@map("lead_history")
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  title     String
+  message   String   @db.Text
+  type      String   @default("info") // info, success, warning, error
+  isRead    Boolean  @default(false)
+  link      String?
+  createdAt DateTime @default(now())
+
+  // Relations
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([isRead])
+  @@index([createdAt])
+  @@map("notifications")
+}
+
+
